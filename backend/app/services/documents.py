@@ -45,6 +45,19 @@ _CHUNK_OVERLAP = 150
 # machines). Tables/layout are lost for these docs; narrative text is retained.
 _MAX_DOCLING_PAGES = 40
 
+
+def _docling_enabled() -> bool:
+    """Master switch for Docling. Set DOCLING_ENABLED=false on small/constrained
+    hosts (e.g. a 512 MB free tier) where torch/Docling would OOM — every PDF
+    then uses the low-memory text-only extractor. Tables/layout are lost; the
+    narrative text (what IE reads) is retained, so PDF ingestion still works."""
+    return os.getenv("DOCLING_ENABLED", "true").strip().lower() not in (
+        "0",
+        "false",
+        "no",
+        "off",
+    )
+
 _converter: Any = None  # lazy Docling DocumentConverter singleton
 
 
@@ -329,6 +342,11 @@ def parse_pdf_bytes(data: bytes, filename: str, *, ocr: bool = False) -> ParsedD
     from pathlib import Path
 
     digest = sha256_of(data)
+
+    # Master switch: on constrained hosts Docling/torch is disabled entirely and
+    # every PDF goes through the low-memory text-only extractor.
+    if not _docling_enabled():
+        return _parse_pdf_textonly(data, filename)
 
     # Large PDFs OOM Docling's page-rasterization pipeline — and a native
     # std::bad_alloc can hard-crash the process (it's not a catchable Python
