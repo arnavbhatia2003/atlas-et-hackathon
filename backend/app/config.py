@@ -24,10 +24,23 @@ class Settings(BaseSettings):
     # Supabase gateway (Kong) URL — kept for later feature use.
     supabase_url: str = Field(default="http://localhost:8000", alias="SUPABASE_URL")
 
-    # CORS: the Vite dev server origin allowed to call this API.
+    # CORS: the frontend origin(s) allowed to call this API. In production set
+    # FRONTEND_ORIGIN to your deployed frontend URL (e.g. the Vercel domain);
+    # FRONTEND_ORIGINS may hold extra comma-separated origins. localhost is
+    # always allowed via a regex for dev.
     frontend_origin: str = Field(
         default="http://localhost:5173", alias="FRONTEND_ORIGIN"
     )
+    frontend_origins: str = Field(default="", alias="FRONTEND_ORIGINS")
+
+    @property
+    def allowed_origins(self) -> list[str]:
+        out: list[str] = []
+        for o in [self.frontend_origin, *self.frontend_origins.split(",")]:
+            o = o.strip().rstrip("/")
+            if o and o not in out:
+                out.append(o)
+        return out
 
     # Embeddings (NVIDIA NIM) for Phase-2 semantic matching.
     embeddings_enabled: bool = Field(default=True, alias="EMBEDDINGS_ENABLED")

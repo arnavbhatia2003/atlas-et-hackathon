@@ -67,9 +67,9 @@ app = FastAPI(title="Atlas API", version="0.1.0", lifespan=lifespan)
 settings = get_settings()
 app.add_middleware(
     CORSMiddleware,
-    # Explicit configured origin, plus any localhost port for dev convenience
+    # Configured production origin(s), plus any localhost port for dev
     # (Vite may fall back from :5173 to :5174 if the port is taken).
-    allow_origins=[settings.frontend_origin],
+    allow_origins=settings.allowed_origins,
     allow_origin_regex=r"http://(localhost|127\.0\.0\.1):\d+",
     allow_credentials=True,
     allow_methods=["*"],
