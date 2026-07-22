@@ -11,7 +11,12 @@ import type {
   WorkflowEvent,
 } from './types'
 
-export const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8001'
+// Strip any trailing slash(es) so a VITE_API_URL like "https://host/" doesn't
+// produce double-slash paths ("https://host//api/...") that 404.
+export const API_URL = (import.meta.env.VITE_API_URL ?? 'http://localhost:8001').replace(
+  /\/+$/,
+  '',
+)
 
 async function getJSON<T>(path: string, signal?: AbortSignal): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
