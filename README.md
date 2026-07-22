@@ -9,6 +9,13 @@ records, and PDFs) into one grounded knowledge graph — then ask it questions,
 diagnose root causes, and check compliance, with every answer traced to a
 source.**
 
+![License: MIT](https://img.shields.io/badge/License-MIT-F26B34.svg)
+![Python 3.13](https://img.shields.io/badge/Python-3.13-3776AB?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-async-009688?logo=fastapi&logoColor=white)
+![React + TypeScript](https://img.shields.io/badge/React-TypeScript-61DAFB?logo=react&logoColor=black)
+![Postgres + pgvector](https://img.shields.io/badge/Postgres-pgvector-4169E1?logo=postgresql&logoColor=white)
+![NVIDIA NIM](https://img.shields.io/badge/LLM-NVIDIA%20NIM-76B900?logo=nvidia&logoColor=white)
+
 </div>
 
 ---
