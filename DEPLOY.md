@@ -1,96 +1,115 @@
-# Deploying Atlas (free stack)
+# Deploying Atlas
 
-Three pieces, all on free hosts, with **no cold start and every feature working**
-(including Docling PDF ingestion):
+Three pieces: a **database** (Supabase), a **backend** (pick one host below), and
+a **frontend** (Vercel). Do step 1, one option in step 2, then steps 3–5.
 
-| Piece | Free host | Notes |
+| Piece | Host | Cost / payment |
 |---|---|---|
-| Frontend (static React) | **Vercel** | Zero-config Vite/SPA, always-on |
-| Backend (FastAPI + Docling) | **Oracle Cloud Always Free VM** | 24 GB ARM VM, always-on, free forever |
-| TLS for the backend | **Caddy + DuckDNS** | Free auto-HTTPS, no bought domain |
-| Database | **Supabase** (free) | Postgres + pgvector |
-| LLM / embeddings / rerank | **NVIDIA NIM** (free) | Already what the app uses |
+| Database | **Supabase** free | Free |
+| Backend — easiest | **Railway** | ~$5/mo, **card only** |
+| Backend — UPI/RuPay | **Hostinger VPS** (or E2E/Utho) | Paid, **UPI + RuPay** |
+| Backend — no card | **Render** free | Free (PDFs text-only, cold starts) |
+| Frontend | **Vercel** free | Free |
+| LLM / embeddings | **NVIDIA NIM** free | Free |
 
-> Why a VM and not Hugging Face / Render? HF now charges for Docker Spaces, and
-> Render's free tier (512 MB) can't run Docling. Oracle's Always Free ARM VM has
-> 24 GB RAM, stays on 24/7 (no cold start), and costs nothing — it only needs a
-> card for identity verification at signup and is never charged.
+Backend options compared:
+
+| | Railway | Hostinger VPS | Render free |
+|---|---|---|---|
+| Full Docling PDFs | Yes | Yes | No (text-only) |
+| Cold start | No | No | Yes (sleeps) |
+| HTTPS | Built-in | via Caddy+DuckDNS | Built-in |
+| Pay by | Card | **UPI / RuPay** | — (free) |
 
 ---
 
 ## 1. Database — Supabase (free)
-
 1. Create a project at [supabase.com](https://supabase.com) → note the DB password.
 2. **SQL Editor** → paste the full contents of `backend/app/db/schema.sql`
-   (it starts with `create extension if not exists vector;`) and **Run**.
-3. **Project Settings → Database → Connection string → URI** (use the
-   connection-pooler URI). That is your `DATABASE_URL`.
+   (it starts with `create extension if not exists vector;`) → **Run**.
+3. **Project Settings → Database → Connection string → URI** (the pooler URI) →
+   this is your `DATABASE_URL`.
 
-## 2. Backend — Oracle Cloud Always Free VM
+---
 
-### 2a. Create the VM
-1. Sign up at [oracle.com/cloud/free](https://www.oracle.com/cloud/free/) (card
-   for verification; Always Free resources are never charged).
-2. **Compute → Instances → Create instance:**
-   - **Shape:** change to **Ampere (Arm) — VM.Standard.A1.Flex**, e.g. 2 OCPU /
-     12 GB (Always Free allows up to 4 OCPU / 24 GB).
-   - **Image:** Ubuntu 22.04.
-   - **SSH keys:** upload/download a key pair so you can SSH in.
-   - Note the instance's **public IP**.
+## 2A. Backend on Railway (easiest — card)
+Railway builds the root `Dockerfile` and serves it on its own HTTPS domain.
+`railway.toml` is already in the repo (Dockerfile builder, health check, 1 replica).
 
-### 2b. Open the ports
-Oracle blocks inbound traffic in two places — open both for TCP **80** and **443**:
-1. **VCN Security List:** Networking → your VCN → Security Lists → default →
-   **Add Ingress Rules**: source `0.0.0.0/0`, TCP, dest ports `80` and `443`.
-2. **Ubuntu's own firewall** (SSH in first — see 2d), then:
+1. [railway.app](https://railway.app) → **New Project → Deploy from GitHub repo**
+   → pick `atlas-et-hackathon`. It auto-detects the Dockerfile and builds
+   (~10–15 min; torch + Docling models bake in).
+2. **Variables** (service → Variables) → add:
+   - `DATABASE_URL` (from step 1)
+   - `NVIDIA_API_KEY`
+   - `EMBEDDING_DIM` = `2048`
+   - `DOCLING_ENABLED` = `true`
+   - `FRONTEND_ORIGIN` = your Vercel URL (fill after step 3)
+3. **Settings → Networking → Generate Domain** → you get
+   `https://<name>.up.railway.app`. Verify `…/api/health` → `healthy`.
+4. If the build/runtime OOMs, raise the service memory in Settings (Hobby allows
+   up to 8 GB; Docling needs ~2 GB).
+
+> Railway is **card-only** and has no free tier (Hobby ≈ $5/mo). If your card is
+> rejected, use option 2B (Hostinger, UPI/RuPay).
+
+## 2B. Backend on Hostinger VPS (UPI / RuPay)
+You get a full Ubuntu VPS with a public IP; the repo's `deploy/` stack (backend +
+Caddy for auto-HTTPS) runs on it. Same steps work on **E2E Networks** or **Utho**
+(also UPI) or any Ubuntu VPS.
+
+1. **Buy a VPS:** Hostinger → VPS → **KVM 1** (4 GB RAM — enough for Docling) or
+   larger. Pay by **UPI or RuPay**. Choose OS **Ubuntu 24.04** (or Hostinger's
+   "Ubuntu + Docker" template to skip the Docker install below). Note the
+   **public IP** and set a root/SSH password in hPanel.
+2. **Free HTTPS domain:** at [duckdns.org](https://www.duckdns.org) create a
+   subdomain (e.g. `atlas-demo`) and point it to the VPS public IP.
+3. **Open ports 80 + 443:** in hPanel's VPS **Firewall** (if enabled) allow TCP
+   80 and 443. (Hostinger usually leaves them open; no separate cloud firewall
+   like Oracle.)
+4. **SSH in** (`ssh root@<public-ip>`) and run:
    ```bash
-   sudo iptables -I INPUT 6 -m state --state NEW -p tcp --dport 80 -j ACCEPT
-   sudo iptables -I INPUT 6 -m state --state NEW -p tcp --dport 443 -j ACCEPT
-   sudo netfilter-persistent save
+   # Docker (skip if you picked the Docker OS template)
+   apt-get update && apt-get install -y docker.io docker-compose-plugin git
+
+   git clone https://github.com/arnavbhatia2003/atlas-et-hackathon.git
+   cd atlas-et-hackathon
+   cp backend/.env.example backend/.env
+   nano backend/.env      # set DATABASE_URL, NVIDIA_API_KEY; DOCLING_ENABLED=true
+
+   DOMAIN=atlas-demo.duckdns.org docker compose -f deploy/docker-compose.yml up -d --build
    ```
+   First build ~10–15 min. Verify `https://atlas-demo.duckdns.org/api/health`.
+5. After step 3 (frontend) set `FRONTEND_ORIGIN` in `backend/.env` to the Vercel
+   URL and re-run the `docker compose ... up -d` line.
 
-### 2c. Free HTTPS domain (DuckDNS)
-1. Go to [duckdns.org](https://www.duckdns.org), sign in, create a subdomain
-   (e.g. `atlas-demo`) → you get `atlas-demo.duckdns.org`.
-2. Set its IP to your VM's **public IP** (the "current ip" box → update).
+> x86 VPS (Hostinger/E2E/Utho) is actually easier than Oracle's ARM — torch's
+> x86 wheels are rock-solid. **E2E/Utho** bill prepaid: top up a small amount by
+> UPI, run an 8 GB node for the demo, destroy it after.
 
-### 2d. Install + run
-SSH in (`ssh -i <key> ubuntu@<public-ip>`), then:
-```bash
-# Docker + compose
-sudo apt-get update && sudo apt-get install -y docker.io docker-compose-plugin git
-sudo usermod -aG docker $USER && newgrp docker
+## 2C. Backend on Render (free, no card)
+Deploys the root `Dockerfile` via `render.yaml`. Free = 512 MB, so PDFs run
+**text-only** (`DOCLING_ENABLED=false`, set for you in `render.yaml`) and the
+service **sleeps when idle** (cold start on wake).
 
-# Get the code
-git clone https://github.com/arnavbhatia2003/atlas-et-hackathon.git
-cd atlas-et-hackathon
+1. [render.com](https://render.com) → **New → Blueprint** → pick the repo.
+2. Set `DATABASE_URL`, `NVIDIA_API_KEY`, `FRONTEND_ORIGIN` in the dashboard.
+3. You get `https://<name>.onrender.com`; verify `…/api/health`.
 
-# Backend secrets (from step 1 + your NVIDIA key)
-cp backend/.env.example backend/.env
-nano backend/.env         # set DATABASE_URL, NVIDIA_API_KEY, FRONTEND_ORIGIN
-
-# Build + run (Caddy gets the TLS cert automatically for your DuckDNS domain)
-DOMAIN=atlas-demo.duckdns.org docker compose -f deploy/docker-compose.yml up -d --build
-```
-First build takes ~10–15 min (torch + Docling models bake into the image).
-Verify: open `https://atlas-demo.duckdns.org/api/health` → `healthy`.
-
-In `backend/.env` set `FRONTEND_ORIGIN` to your Vercel URL (from step 3) and
-`EMBEDDING_DIM=2048` (matches the schema). After editing, re-run the
-`docker compose ... up -d` line to apply.
+---
 
 ## 3. Frontend — Vercel (free)
-
 1. [vercel.com](https://vercel.com) → **Add New → Project** → import the repo.
-2. **Root Directory: `frontend`** (Vite auto-detected; `vercel.json` handles the
-   SPA rewrite).
-3. **Environment Variables** → `VITE_API_URL = https://atlas-demo.duckdns.org`
-4. Deploy → you get `https://<project>.vercel.app`.
+2. **Root Directory: `frontend`** (`vercel.json` handles the SPA rewrite).
+3. **Environment Variables** → `VITE_API_URL =` your backend URL from step 2
+   (the Railway / DuckDNS / Render HTTPS URL).
+4. Deploy → `https://<project>.vercel.app`.
 
 ## 4. Wire CORS
-Set the VM's `backend/.env` → `FRONTEND_ORIGIN=https://<project>.vercel.app`,
-then re-run the `docker compose ... up -d` line. (Extra origins:
-`FRONTEND_ORIGINS`, comma-separated. localhost stays allowed for dev.)
+Set the backend's `FRONTEND_ORIGIN` to your exact Vercel URL, then redeploy /
+restart the backend. (Railway/Render: update the variable; Hostinger: edit
+`backend/.env` and re-run compose.) Extra origins: `FRONTEND_ORIGINS`
+(comma-separated). localhost stays allowed for dev.
 
 ## 5. Seed the demo
 Add the five connectors in [`demo/connectors/`](demo/connectors/) from the
@@ -100,14 +119,12 @@ Connectors page (each as a `manual` connector, then Sync), and follow
 ---
 
 ## Notes
-- **No cold start:** the VM runs 24/7 and `restart: always` brings the stack back
-  after any reboot. The only latency you can't remove is the NVIDIA NIM endpoint's
-  first-call warm-up (upstream); the app warms it on startup.
-- **NVIDIA NIM** free tier is 40 requests/min **shared across all calls**. A
-  public URL means anyone could consume the budget — fine for a judged demo.
-- **Supabase free** pauses after ~7 days of inactivity; open the dashboard to
-  resume.
-- **Single worker** is required — the ingest job registry and DB pool assume one
-  process. Don't add `--workers`.
-- **ARM note:** the VM is ARM64; torch/Docling install from their aarch64 wheels.
-  If a build ever fails on a package wheel, that's the place to look.
+- **Single worker** is required everywhere (ingest job registry + DB pool assume
+  one process). Don't add `--workers` or extra replicas.
+- **`DOCLING_ENABLED`**: `true` on Railway/VPS (≥2 GB RAM, full tables+layout);
+  `false` on Render free (text-only, won't OOM).
+- **NVIDIA NIM** free tier = 40 req/min shared across all calls; a public URL
+  means anyone can consume the budget (fine for a judged demo).
+- **Supabase free** pauses after ~7 days idle — open the dashboard to resume.
+- **Watch add-on charges** on prepaid Indian clouds (e.g. a public-IP line item);
+  check the bill breakdown.
