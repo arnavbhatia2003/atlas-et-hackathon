@@ -23,6 +23,9 @@ async def init_pool() -> asyncpg.Pool:
             min_size=1,
             max_size=5,
             command_timeout=10,
+            # Fail fast on an unreachable DB (e.g. wrong host / IPv6-only direct
+            # connection) instead of hanging the whole startup for ~60s.
+            timeout=10,
         )
     return _pool
 

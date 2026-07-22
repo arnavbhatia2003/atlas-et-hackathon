@@ -51,8 +51,23 @@ async def _warm_embeddings() -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Create the Postgres pool on startup, tear it down on shutdown.
-    await init_pool()
+    # Create the Postgres pool on startup, tear it down on shutdown. If the DB
+    # is unreachable, log the host + error clearly (a hung/blank startup is the
+    # usual "stuck at Deploying" symptom) before failing — never leak the password.
+    try:
+        await init_pool()
+    except Exception as exc:  # noqa: BLE001 - surface DB startup failures loudly
+        from urllib.parse import urlsplit
+
+        host = urlsplit(get_settings().database_url).hostname or "?"
+        logger.error(
+            "Database connection FAILED at startup (host=%s): %s. "
+            "Check DATABASE_URL — for Supabase use the IPv4 'Session pooler' "
+            "string (user postgres.<ref>), not the IPv6 'Direct connection'.",
+            host,
+            exc,
+        )
+        raise
     # Warm the embedding endpoint in the background (does not block readiness).
     warmup_task = asyncio.create_task(_warm_embeddings())
     try:
