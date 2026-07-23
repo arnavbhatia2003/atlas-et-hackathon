@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom'
 import {
   ArrowRight,
   FileText,
-  MessageSquareText,
   Radio,
   ShieldCheck,
   Upload,
@@ -37,49 +36,34 @@ export function Home() {
 
   return (
     <>
-      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-3xl font-semibold tracking-tight">
-            <span className="mark-accent">{greeting()}</span>
-          </h1>
-          <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
-            {hasData
-              ? 'A short operational summary — not a telemetry wall. Everything traces back to a source.'
-              : 'No evidence has been ingested yet. Start by adding a source system.'}
-          </p>
-        </div>
-        <Button asChild>
-          <Link to="/ask">
-            <MessageSquareText />
-            Ask Copilot
-          </Link>
-        </Button>
+      <div className="mb-8">
+        <h1 className="text-3xl font-semibold tracking-tight">
+          <span className="mark-accent">{greeting()}</span>
+        </h1>
+        <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
+          {hasData
+            ? 'A short operational summary — not a telemetry wall. Everything traces back to a source.'
+            : 'No evidence has been ingested yet. Start by adding a source system.'}
+        </p>
       </div>
 
       {/* Priorities */}
       <section className="mb-10">
-        <h2 className="text-sm font-semibold">Today's priorities</h2>
-        <p className="mb-4 text-sm text-muted-foreground">
-          What needs attention across the shared evidence model.
-        </p>
         <div className="grid gap-4 sm:grid-cols-3">
           <MetricCard
             loading={overview.loading}
             value={o?.review_open ?? 0}
             label="items awaiting review"
-            badge={<Badge variant="review">Needs review</Badge>}
           />
           <MetricCard
             loading={overview.loading}
             value={o?.unified_assets ?? 0}
             label="unified assets resolved"
-            badge={<Badge variant="linked">Linked</Badge>}
           />
           <MetricCard
             loading={overview.loading}
             value={o?.source_records ?? 0}
             label="source records indexed"
-            badge={<Badge variant="verified">Grounded</Badge>}
           />
         </div>
       </section>
@@ -201,27 +185,22 @@ export function Home() {
 function MetricCard({
   value,
   label,
-  badge,
   loading,
 }: {
   value: number
   label: string
-  badge: React.ReactNode
   loading: boolean
 }) {
   return (
-    <Card className="gap-3 py-5">
-      <div className="flex items-start justify-between px-5">
-        {loading ? (
-          <Skeleton className="h-9 w-12" />
-        ) : (
-          <span className="text-3xl font-semibold tracking-tight tabular-nums">
-            {value}
-          </span>
-        )}
-        {badge}
-      </div>
-      <p className="px-5 text-sm text-muted-foreground">{label}</p>
+    <Card className="items-center gap-2 py-6 text-center">
+      {loading ? (
+        <Skeleton className="h-9 w-12" />
+      ) : (
+        <span className="text-3xl font-semibold tracking-tight tabular-nums">
+          {value}
+        </span>
+      )}
+      <p className="text-sm text-muted-foreground">{label}</p>
     </Card>
   )
 }

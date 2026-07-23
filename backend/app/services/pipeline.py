@@ -195,6 +195,8 @@ async def ingest_records(
                 await conn.execute("delete from operational_extractions")
                 await conn.execute("delete from source_systems")
                 await conn.execute("delete from discovered_fields")
+                await conn.execute("delete from document_parses")
+                await conn.execute("delete from doc_extractions")
                 await conn.execute("delete from review_queue where kind <> 'manual'")
             yield {"step": "complete", "message": "Nothing to resolve", "summary": _empty_summary()}
             return

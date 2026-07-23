@@ -170,16 +170,9 @@ export function Documents() {
       </div>
 
       <div className="mb-6">
-        <Badge variant="verified">Document ingestion</Badge>
-        <h1 className="mt-2 text-2xl font-semibold tracking-tight sm:text-[1.75rem]">
+        <h1 className="text-2xl font-semibold tracking-tight sm:text-[1.75rem]">
           Ingest documents (PDF)
         </h1>
-        <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-          Docling parses each PDF, the parse is durably stored (chain-of-custody)
-          before anything else, then assets, incidents, rules, and work orders are
-          extracted and resolved into the graph. Ingestion runs in the background —
-          you can leave this page and come back; it keeps going.
-        </p>
       </div>
 
       {/* Upload */}

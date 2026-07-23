@@ -1,9 +1,11 @@
+import { useEffect, useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import {
   Boxes,
   ClipboardCheck,
   Home,
   MessageSquareText,
+  PanelLeft,
   Plug,
   Share2,
   SquareStack,
@@ -35,13 +37,9 @@ const SECONDARY: NavItem[] = [
 
 function Brand() {
   // The source PNG (1536x1024) has large transparent padding around the "Atlas"
-  // script (~17% top, ~29% bottom, ~7% sides). We clip to just the wordmark so
-  // it renders large and tight instead of small-inside-empty-space.
+  // script. We clip to just the wordmark so it renders large and tight.
   return (
-    <div
-      className="overflow-hidden"
-      style={{ width: 122, height: 52 }}
-    >
+    <div className="overflow-hidden" style={{ width: 122, height: 52 }}>
       <img
         src="/atlas-logo.png"
         alt="Atlas"
@@ -53,18 +51,20 @@ function Brand() {
   )
 }
 
-function SideNavLink({ item }: { item: NavItem }) {
+function SideNavLink({ item, collapsed }: { item: NavItem; collapsed: boolean }) {
   const Icon = item.icon
   return (
     <NavLink
       to={item.to}
       end={item.to === '/'}
+      title={collapsed ? item.label : undefined}
       className={({ isActive }) =>
         cn(
-          'group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors',
+          'group relative flex items-center rounded-xl text-sm font-medium transition-colors',
+          collapsed ? 'justify-center px-0 py-2.5' : 'gap-3 px-3 py-2.5',
           isActive
-            ? 'bg-card text-foreground shadow-soft'
-            : 'text-muted-foreground hover:bg-card/60 hover:text-foreground',
+            ? 'bg-secondary text-foreground'
+            : 'text-muted-foreground hover:bg-secondary/70 hover:text-foreground',
         )
       }
     >
@@ -78,10 +78,10 @@ function SideNavLink({ item }: { item: NavItem }) {
             aria-hidden
           />
           <Icon
-            className={cn('size-4.5', isActive && 'text-primary')}
+            className={cn('size-4.5 shrink-0', isActive && 'text-primary')}
             aria-hidden
           />
-          {item.label}
+          {!collapsed && item.label}
         </>
       )}
     </NavLink>
@@ -108,27 +108,58 @@ function BottomTab({ item }: { item: NavItem }) {
 }
 
 export function AppShell({ children }: { children: React.ReactNode }) {
+  const [collapsed, setCollapsed] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false
+    return localStorage.getItem('atlas.sidebar.collapsed') === '1'
+  })
+  useEffect(() => {
+    localStorage.setItem('atlas.sidebar.collapsed', collapsed ? '1' : '0')
+  }, [collapsed])
+
   return (
-    <div className="min-h-svh">
+    <div
+      className="min-h-svh"
+      style={{ ['--sidebar-w' as string]: collapsed ? '4.5rem' : '16rem' }}
+    >
       {/* Animated shader background — sits behind everything, ignores input */}
       <ShaderBackground />
 
-      {/* Desktop sidebar */}
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col gap-8 px-4 py-6 md:flex">
-        <div className="px-2">
-          <Brand />
+      {/* Desktop sidebar — a frosted card-surface panel, collapsible to a rail */}
+      <aside
+        className={cn(
+          'fixed inset-y-0 left-0 z-30 hidden flex-col gap-6 border-r border-border/60 bg-card/80 py-5 backdrop-blur-md transition-[width,padding] duration-200 ease-out md:flex',
+          collapsed ? 'w-[4.5rem] px-2' : 'w-64 px-4',
+        )}
+      >
+        <div
+          className={cn(
+            'flex items-center',
+            collapsed ? 'justify-center' : 'justify-between px-2',
+          )}
+        >
+          {!collapsed && <Brand />}
+          <button
+            onClick={() => setCollapsed((c) => !c)}
+            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            className="flex size-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+          >
+            <PanelLeft className="size-4.5" />
+          </button>
         </div>
         <nav className="flex flex-col gap-1">
           {PRIMARY.map((item) => (
-            <SideNavLink key={item.to} item={item} />
+            <SideNavLink key={item.to} item={item} collapsed={collapsed} />
           ))}
         </nav>
         <div className="flex flex-col gap-1">
-          <p className="px-3 pb-1 text-xs font-medium text-muted-foreground/70">
-            Records
-          </p>
+          {!collapsed && (
+            <p className="px-3 pb-1 text-xs font-medium text-muted-foreground/70">
+              Records
+            </p>
+          )}
           {SECONDARY.map((item) => (
-            <SideNavLink key={item.to} item={item} />
+            <SideNavLink key={item.to} item={item} collapsed={collapsed} />
           ))}
         </div>
       </aside>
@@ -138,8 +169,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <Brand />
       </header>
 
-      {/* Main content */}
-      <main className="px-4 pb-24 pt-6 md:ml-64 md:px-8 md:pb-10 lg:px-12">
+      {/* Main content — margin follows the sidebar width via the CSS var */}
+      <main className="px-4 pb-24 pt-6 transition-[margin] duration-200 ease-out md:ml-[var(--sidebar-w)] md:px-8 md:pb-10 lg:px-12">
         <div className="mx-auto w-full max-w-6xl">{children}</div>
       </main>
 

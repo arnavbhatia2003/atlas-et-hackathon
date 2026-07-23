@@ -1,13 +1,12 @@
 import { cn } from '@/lib/utils'
 
 /**
- * Standard page header: a small status eyebrow (dot + label), a strong title,
- * supporting text, and an optional action slot on the right.
+ * Standard page header: just the main title, with an optional action slot on
+ * the right. `eyebrow` / `description` are accepted for backwards compatibility
+ * but no longer rendered (pages show only the title, per design direction).
  */
 export function PageHeader({
-  eyebrow,
   title,
-  description,
   action,
   className,
 }: {
@@ -25,20 +24,12 @@ export function PageHeader({
       )}
     >
       <div className="min-w-0">
-        {eyebrow && (
-          <div className="mb-2 flex items-center gap-2 text-xs font-medium text-muted-foreground">
-            <span className="size-1.5 rounded-full bg-verified" aria-hidden />
-            {eyebrow}
-          </div>
-        )}
+        {/* eyebrow + description are intentionally not rendered — pages show
+            only the main title (per design direction). Props kept optional so
+            existing call sites don't need to change. */}
         <h1 className="text-2xl font-semibold tracking-tight sm:text-[1.75rem]">
           {title}
         </h1>
-        {description && (
-          <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-            {description}
-          </p>
-        )}
       </div>
       {action && <div className="shrink-0">{action}</div>}
     </div>
